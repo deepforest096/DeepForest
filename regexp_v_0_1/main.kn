@@ -1,0 +1,110 @@
+;************************************************************************
+; regexのラッパー
+
+; パターンに合致するかどうかを返す
+func hitRE(text:[]char,pattern:[]char):bool
+	var re :regex@Regex :: regex@makeRegex(pattern)
+	var pos:int
+	var line:[][]char
+	var isHit:bool
+	
+	do line :: re.find(&pos,text,-1)
+	if(pos=-1)
+		do isHit :: false
+	else
+		do isHit :: true
+	end if
+	
+	ret isHit
+end func
+
+; パターンに合致する部分を抽出する
+func dripRE(text:[]char,pattern:[]char):[]char
+	var re :regex@Regex :: regex@makeRegex(pattern)
+	var pos:int
+	var line:[][]char
+	var rslt:[]char
+	
+	do line :: re.find(&pos,text,-1) 
+	if(pos=-1)
+		do rslt :: ""
+	else
+		do rslt :: line[0]
+	end if
+	
+	ret rslt
+end func
+
+; パターンに合致する部分を置換する
+func modifyRE(text:[]char,pattern:[]char,after:[]char):[]char
+	var re :regex@Regex :: regex@makeRegex(pattern)
+	ret re.replace(text,after,true)
+end func
+
+;************************************************************************
+; regexライブラリを使ってみる
+
+func runTest()
+	var line:[]char
+	do line :: @editText.getText()
+	do line :: @modifyRE(line,"[Kk][KkUuIiNn1]*[Nn]","Kuin")
+	do @editText.setText(line)
+end func
+
+;************************************************************************
+; ウインドウやコントロール
+var wndMain: wnd@Wnd
+var editText: wnd@EditMulti
+
+func main()
+	; ウインドウの作成
+	do @wndMain :: wnd@makeWnd(null, %normal, 512, 384, "RegExp")
+	do @wndMain.onClose :: @wndMainOnClose {ウインドウが閉じられたときのイベントを登録}
+	do @wndMain.onPushMenu :: @wndMainOnPushMenu {メニューが選択されたときのイベントを登録}
+	do @editText :: wnd@makeEditMulti(@wndMain, 6, 6, 500, 372, %scale, %scale)
+	
+	; メニューの作成
+	var menuMain: wnd@Menu :: wnd@makeMenu()
+	var popupMainFile: wnd@Popup :: wnd@makePopup()
+	do menuMain.addPopup("&File", popupMainFile)
+	do popupMainFile.add(16#0001, "&New")
+	do popupMainFile.add(16#0002, "&Run")
+	do popupMainFile.addLine()
+	do popupMainFile.add(16#0003, "E&xit")
+	; メニューの登録
+	do @wndMain.setMenu(menuMain)
+	
+	; キーの割当て変更
+	do input@setCfgKey(0, %a, [%f1 $ input@Key, %f2, %f3])
+	
+	; ユーザが操作を行うのを待機する
+	while(wnd@act())
+	    if(input@pad(0, %a) = 1)
+	      do @runTest()
+	    end if
+	end while
+end func
+
+; ウインドウが閉じられたときに呼ばれるイベント関数
+func wndMainOnClose(wnd: wnd@WndBase): bool
+	var result: wnd@MsgBoxResult :: wnd@msgBox(@wndMain, "終了しても良いですか？", "Kuinote", %warn, %yesNoCancel)
+	if(result = %yes)
+		ret true {trueを返すとウインドウは閉じる}
+	else
+		ret false {falseを返すとウインドウは閉じない}
+	end if
+end func
+
+; メニューが選択されたときに呼ばれるイベント関数
+func wndMainOnPushMenu(wnd: wnd@WndBase, id: int)
+	switch(id)
+	case 16#0001 {New}
+		do @editText.setText("") {テキストを空にする}
+	case 16#0002 {Run}
+		do @runTest()
+	case 16#0003 {Exit}
+		do @wndMain.close() {ウインドウを閉じる}
+	end switch
+end func
+
+
