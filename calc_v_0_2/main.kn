@@ -1,0 +1,167 @@
+;************************************************************************
+; regexのラッパー
+
+; パターンに合致するかどうかを返す
+func hitRE(text:[]char,pattern:[]char):bool
+	var re :regex@Regex :: regex@makeRegex(pattern)
+	var pos:int
+	var line:[][]char
+	var isHit:bool
+	
+	do line :: re.find(&pos,text,-1)
+	if(pos=-1)
+		do isHit :: false
+	else
+		do isHit :: true
+	end if
+	
+	ret isHit
+end func
+
+; パターンに合致する部分を抽出する
+func dripRE(text:[]char,pattern:[]char):[]char
+	var re :regex@Regex :: regex@makeRegex(pattern)
+	var pos:int
+	var line:[][]char
+	var rslt:[]char
+	
+	do line :: re.find(&pos,text,-1) 
+	if(pos=-1)
+		do rslt :: ""
+	else
+		do rslt :: line[0]
+	end if
+	
+	ret rslt
+end func
+
+; パターンに合致する部分を置換する
+func modifyRE(text:[]char,pattern:[]char,after:[]char):[]char
+	var re :regex@Regex :: regex@makeRegex(pattern)
+	ret re.replace(text,after,true)
+end func
+
+;************************************************************************
+
+;実行
+func runTest()
+	var line:[]char
+	
+	do line :: @editText.getText() ~ " "
+	do line :: @ExeOne(line)
+	do line :: @modifyRE(line, " +", " ")
+	do @editText.setText(line)
+end func
+
+func ExeOne(text:[]char):[]char
+	var part1:[]char
+	var part2:[]char
+	var tar:[]char
+	var ans:[]char
+	
+	do part2 :: @modifyRE(text, "^ *((0|-?[1-9][0-9]*) +)+[+*-] ", "")
+	do part1 :: text.sub(0, ^text - ^part2)
+	if(@hitRE(part1, " *((0|-?[1-9][0-9]*) +){2,}[+*-] "))
+		do tar :: @dripRE(part1, "((0|-?[1-9][0-9]*) +){2}[+*-] ")
+		do part1 :: part1.sub(0, ^part1 - ^tar)
+		do ans :: @CalcOne(tar)
+
+		do ans :: part1 ~ " " ~ ans ~ " " ~ part2
+	else
+		do ans :: text
+	end if
+
+	ret ans
+end func
+
+func CalcOne(text:[]char):[]char
+	var op  :[]char
+	var valA:[]char
+	var valB:[]char
+	var ans :[]char :: ""
+	var a : int
+	var b : int
+	var r : int :: 0
+	
+	do valA :: @dripRE(text, "[^ ]+")
+	do text :: @modifyRE(text, "^ *[^ ]+", "")
+	do valB :: @dripRE(text, "[^ ]+")
+	do text :: @modifyRE(text, "^ *[^ ]+", "")
+	do op   :: @dripRE(text, "[^ ]+")
+
+	do valA.toInt(&a)
+	do valB.toInt(&b)
+	
+	switch(op)
+	case "+"
+		do r :: a + b
+	case "-"
+		do r :: a - b
+	case "*"
+		do r :: a * b
+	end switch
+
+	do ans :: r.toStr()
+	
+	ret ans
+end func
+
+;************************************************************************
+; ウインドウやコントロール
+var wndMain: wnd@Wnd
+var editText: wnd@EditMulti
+
+func main()
+	; ウインドウの作成
+	do @wndMain :: wnd@makeWnd(null, %normal, 512, 105, "Calc.")
+	do @wndMain.onClose :: @wndMainOnClose {ウインドウが閉じられたときのイベントを登録}
+	do @wndMain.onPushMenu :: @wndMainOnPushMenu {メニューが選択されたときのイベントを登録}
+	do @editText :: wnd@makeEditMulti(@wndMain, 6, 6, 500, 93, %scale, %scale)
+	
+	; メニューの作成
+	var menuMain: wnd@Menu :: wnd@makeMenu()
+	var popupMainFile: wnd@Popup :: wnd@makePopup()
+	do menuMain.addPopup("&File", popupMainFile)
+	do popupMainFile.add(16#0001, "&New")
+	do popupMainFile.add(16#0002, "&Run")
+	do popupMainFile.addLine()
+	do popupMainFile.add(16#0003, "E&xit")
+	; メニューの登録
+	do @wndMain.setMenu(menuMain)
+	
+	; キーの割当て変更
+	do input@setCfgKey(0, %a, [%f1 $ input@Key, %f2, %f3])
+
+	; 初期表示
+	do @editText.setText(" 1 2 + 3 4 - * ")
+	
+	; ユーザが操作を行うのを待機する
+	while(wnd@act())
+	    if(input@pad(0, %a) = 1)
+	      do @runTest()
+	    end if
+	end while
+end func
+
+; ウインドウが閉じられたときに呼ばれるイベント関数
+func wndMainOnClose(wnd: wnd@WndBase): bool
+	var result: wnd@MsgBoxResult :: wnd@msgBox(@wndMain, "終了しても良いですか？", "Kuinote", %warn, %yesNoCancel)
+	if(result = %yes)
+		ret true {trueを返すとウインドウは閉じる}
+	else
+		ret false {falseを返すとウインドウは閉じない}
+	end if
+end func
+
+; メニューが選択されたときに呼ばれるイベント関数
+func wndMainOnPushMenu(wnd: wnd@WndBase, id: int)
+	switch(id)
+	case 16#0001 {New}
+		; 7 4 - 3 4 * 9 - -1 * + 
+		do @editText.setText(" 7 4 3 4 9 -1 ")
+	case 16#0002 {Run}
+		do @runTest()
+	case 16#0003 {Exit}
+		do @wndMain.close() {ウインドウを閉じる}
+	end switch
+end func
